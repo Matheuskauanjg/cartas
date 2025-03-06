@@ -98,7 +98,7 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Utiliza a função do cardService para remover a carta do deck e adicionar ao conjunto de jogadas
+    // Chama a função do cardService para remover a carta e atualizar o banco de dados
     await removePlayedCard("game-room-1", user, selectedCard, gameState);
 
     setSelectedCard(null); // Limpa a carta selecionada após jogar
