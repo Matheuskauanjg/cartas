@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
-import { removePlayedCard } from "../services/cardService"; // Importa a função do serviço
+import { removeCardFromPlayerDeck } from "../services/cardService"; // Importa a função do serviço
 import cardsData from "../data/cards.json";
 
 function Game() {
@@ -98,7 +98,7 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Adiciona a carta ao banco de dados (não remove até o juiz escolher a vencedora)
+    // Adiciona a carta ao banco de dados
     await updateDoc(doc(db, "games", "game-room-1"), {
       playedCards: [
         ...gameState.playedCards,
@@ -122,7 +122,6 @@ function Game() {
     const winner = Object.keys(updatedScores).find(player => updatedScores[player] >= 8);
 
     if (winner) {
-      // Atualiza os dados e marca o vencedor da partida
       await updateDoc(gameRef, {
         winner: winner,
         scores: updatedScores,
@@ -130,7 +129,6 @@ function Game() {
         roundOver: true,
       });
     } else {
-      // Troca o juiz e passa a vez
       const currentJudgeIndex = gameState.players.findIndex(player => player.name === gameState.judge);
       const nextJudge = gameState.players[(currentJudgeIndex + 1) % gameState.players.length].name;
 
@@ -142,19 +140,18 @@ function Game() {
       });
     }
 
-    // Remover a carta do deck do jogador que foi escolhida pelo juiz
-    await removePlayedCard(gameState.playedCards, winningCard.user, winningCard.card, gameState);
+    // Remover a carta do deck do jogador que foi escolhida
+    await removeCardFromPlayerDeck(gameState.playedCards, winningCard.user, winningCard.card, gameState);
   };
 
   const nextRound = async () => {
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Pega nova carta preta (black card)
     const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
     await updateDoc(gameRef, {
       playedCards: [],
-      blackCard: randomBlackCard,  // Mantém as cartas brancas dos jogadores
+      blackCard: randomBlackCard,  // Atualiza a carta preta
       timer: 30,
       roundOver: false,
     });
