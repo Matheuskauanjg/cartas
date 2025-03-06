@@ -32,7 +32,11 @@ function Game() {
 
       if (!docSnap.exists()) {
         const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-        const initialPlayers = [{ name: user.displayName, score: 0, whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) }]; // Deck inicial de cartas brancas
+        const initialPlayers = [{ 
+          name: user.displayName, 
+          score: 0, 
+          whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // Deck inicial de cartas brancas
+        }];
 
         await setDoc(gameRef, {
           blackCard: randomBlackCard,
@@ -56,7 +60,11 @@ function Game() {
           roundOver: false,
         });
       } else {
-        setGameState(docSnap.data());
+        const gameData = docSnap.data();
+        setGameState({
+          ...gameData,
+          players: gameData.players || [], // Certifique-se de que 'players' existe
+        });
       }
     };
 
@@ -134,7 +142,7 @@ function Game() {
     // Encontra o jogador e remove a carta escolhida do seu deck
     const updatedPlayers = gameState.players.map((p) => {
       if (p.name === player) {
-        p.whiteCards = p.whiteCards.filter((card) => card !== selectedCard); // Remove a carta do deck do jogador
+        p.whiteCards = p.whiteCards?.filter((card) => card !== selectedCard) || []; // Garante que whiteCards existe
       }
       return p;
     });
@@ -168,8 +176,8 @@ function Game() {
     const gameRef = doc(db, "games", "game-room-1");
 
     const updatedPlayers = gameState.players.map((player) => {
-      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - player.whiteCards.length));
-      player.whiteCards = [...player.whiteCards, ...newCards];
+      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0))); // Verifica o tamanho de whiteCards
+      player.whiteCards = [...(player.whiteCards || []), ...newCards]; // Garante que whiteCards existe
       return player;
     });
 
@@ -187,7 +195,7 @@ function Game() {
         {gameState?.players?.map((player, index) => (
           player.name === user.displayName && gameState.judge !== user.displayName && !gameState.roundOver && (
             <div key={index}>
-              {player.whiteCards.map((card, idx) => (
+              {player.whiteCards?.map((card, idx) => (
                 <button key={idx} onClick={() => setSelectedCard(card)}>
                   {card}
                 </button>
@@ -231,7 +239,7 @@ function Game() {
         Próxima Rodada
       </button>
 
-      <button onClick={buyCards} disabled={gameState.whiteCards.length >= 5 || gameState.roundOver}>
+      <button onClick={buyCards} disabled={gameState.whiteCards?.length >= 5 || gameState.roundOver}>
         Comprar Cartas
       </button>
 
