@@ -97,8 +97,11 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Adiciona a carta jogada ao Firestore (sem remover até ser escolhida)
+    const newWhiteCards = gameState.whiteCards.filter(card => card !== selectedCard);
+
+    // Atualizando o banco de dados para remover a carta do jogador
     await updateDoc(doc(db, "games", "game-room-1"), {
+      whiteCards: newWhiteCards,
       playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
     });
 
