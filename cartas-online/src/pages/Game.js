@@ -32,12 +32,17 @@ function Game() {
 
       if (!docSnap.exists()) {
         const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-        const initialPlayers = [{ 
-          name: user.displayName, 
-          score: 0, 
-          whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // Deck inicial de cartas brancas
-        }];
 
+        // Inicializa os jogadores e distribui as cartas
+        const initialPlayers = [
+          { 
+            name: user.displayName, 
+            score: 0, 
+            whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // 10 cartas brancas para o jogador
+          },
+        ];
+
+        // Cria o estado inicial do jogo no Firebase
         await setDoc(gameRef, {
           blackCard: randomBlackCard,
           playedCards: [],
@@ -63,7 +68,7 @@ function Game() {
         const gameData = docSnap.data();
         setGameState({
           ...gameData,
-          players: gameData.players || [], // Certifique-se de que 'players' existe
+          players: gameData.players || [], // Garante que 'players' existe
         });
       }
     };
@@ -90,7 +95,6 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Envia a carta jogada para o banco de dados
     await updateDoc(doc(db, "games", "game-room-1"), {
       playedCards: [
         ...gameState.playedCards,
@@ -98,7 +102,7 @@ function Game() {
       ],
     });
 
-    setSelectedCard(null); // Limpa a carta selecionada após jogar
+    setSelectedCard(null);
   };
 
   const chooseWinner = async (winningCard) => {
@@ -132,23 +136,21 @@ function Game() {
       });
     }
 
-    // Remover a carta do deck do jogador que foi escolhida
     await removeCardFromPlayerDeck(winningCard.user, winningCard.card);
   };
 
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Encontra o jogador e remove a carta escolhida do seu deck
     const updatedPlayers = gameState.players.map((p) => {
       if (p.name === player) {
-        p.whiteCards = p.whiteCards?.filter((card) => card !== selectedCard) || []; // Garante que whiteCards existe
+        p.whiteCards = p.whiteCards?.filter((card) => card !== selectedCard) || [];
       }
       return p;
     });
 
     await updateDoc(gameRef, {
-      players: updatedPlayers, // Atualiza os decks dos jogadores no banco de dados
+      players: updatedPlayers,
     });
   };
 
@@ -157,9 +159,8 @@ function Game() {
 
     const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
-    // Distribui novas cartas brancas para todos os jogadores
     const updatedPlayers = gameState.players.map((player) => {
-      player.whiteCards = shuffle(cardsData.whiteCards.slice(0, 10)); // Nova distribuição de cartas brancas
+      player.whiteCards = shuffle(cardsData.whiteCards.slice(0, 10)); // Distribui novas cartas
       return player;
     });
 
@@ -168,7 +169,7 @@ function Game() {
       blackCard: randomBlackCard,
       timer: 30,
       roundOver: false,
-      players: updatedPlayers, // Atualiza os decks dos jogadores
+      players: updatedPlayers,
     });
   };
 
@@ -176,13 +177,13 @@ function Game() {
     const gameRef = doc(db, "games", "game-room-1");
 
     const updatedPlayers = gameState.players.map((player) => {
-      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0))); // Verifica o tamanho de whiteCards
-      player.whiteCards = [...(player.whiteCards || []), ...newCards]; // Garante que whiteCards existe
+      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0)));
+      player.whiteCards = [...(player.whiteCards || []), ...newCards];
       return player;
     });
 
     await updateDoc(gameRef, {
-      players: updatedPlayers, // Atualiza o deck de cada jogador
+      players: updatedPlayers,
     });
   };
 
