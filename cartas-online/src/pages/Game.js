@@ -149,14 +149,12 @@ function Game() {
   const nextRound = async () => {
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Pega nova carta preta e redistribui as cartas brancas
+    // Pega nova carta preta (black card)
     const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-    const randomWhiteCards = [...cardsData.whiteCards].sort(() => 0.5 - Math.random()).slice(0, 10);
 
     await updateDoc(gameRef, {
       playedCards: [],
-      blackCard: randomBlackCard,
-      whiteCards: randomWhiteCards,
+      blackCard: randomBlackCard,  // Mantém as cartas brancas dos jogadores
       timer: 30,
       roundOver: false,
     });
