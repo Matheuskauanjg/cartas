@@ -1,20 +1,14 @@
-// src/services/cardService.js
+import { updateDoc, doc } from "firebase/firestore";
 
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../firebase";
+export const removePlayedCard = async (gameRoom, user, selectedCard, gameState) => {
+  const gameRef = doc(gameState.db, "games", gameRoom);
 
-// Função para remover a carta jogada da mão do jogador, se for escolhida pelo juiz
-export const removePlayedCard = async (gameId, user, selectedCard, gameState) => {
-  const gameRef = doc(db, "games", gameId);
+  // Remove a carta jogada do deck do jogador
+  const newWhiteCards = gameState.whiteCards.filter(card => card !== selectedCard);
 
-  // Se a carta foi escolhida pelo juiz, removê-la da mão do jogador
-  if (gameState.winner && gameState.winner.user === user.displayName) {
-    const newWhiteCards = gameState.whiteCards.filter(card => card !== selectedCard);
-
-    // Atualiza a mão do jogador e as cartas jogadas no banco de dados
-    await updateDoc(gameRef, {
-      whiteCards: newWhiteCards,
-      playedCards: [...gameState.playedCards, { user: user.displayName, card: selectedCard }]
-    });
-  }
+  // Atualiza o deck e adiciona a carta jogada no banco de dados
+  await updateDoc(gameRef, {
+    whiteCards: newWhiteCards,
+    playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
+  });
 };
