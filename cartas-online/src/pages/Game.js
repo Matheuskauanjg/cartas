@@ -143,7 +143,7 @@ function Game() {
     }
 
     // Remover a carta do deck do jogador que foi escolhida pelo juiz
-    await removePlayedCard(gameState.playedCards, winningCard.user, winningCard.card);
+    await removePlayedCard(gameState.playedCards, winningCard.user, winningCard.card, gameState);
   };
 
   const nextRound = async () => {
