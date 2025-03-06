@@ -18,7 +18,10 @@ function Game() {
 
     try {
       const gameSnap = await getDoc(gameRef);
-      if (!gameSnap.exists()) return;
+      if (!gameSnap.exists()) {
+        console.log("Jogo não encontrado");
+        return;
+      }
 
       const gameData = gameSnap.data();
       const currentPlayers = gameData.players || [];
@@ -28,13 +31,15 @@ function Game() {
         const newPlayer = {
           name: user.displayName,
           score: 0,
-          whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // Cada jogador recebe 10 cartas no início
+          whiteCards: shuffle(cardsData.whiteCards).slice(0, 10),
         };
 
         await updateDoc(gameRef, { players: [...currentPlayers, newPlayer] });
+        console.log("Jogador adicionado:", newPlayer);
       } else if (!existingPlayer.whiteCards || existingPlayer.whiteCards.length === 0) {
         existingPlayer.whiteCards = shuffle(cardsData.whiteCards).slice(0, 10);
         await updateDoc(gameRef, { players: currentPlayers });
+        console.log("Cartas do jogador atualizadas:", existingPlayer);
       }
     } catch (error) {
       console.error("Erro ao adicionar jogador:", error);
@@ -43,6 +48,7 @@ function Game() {
 
   useEffect(() => {
     if (!user) {
+      console.log("Usuário não autenticado, redirecionando para login");
       navigate("/login");
       return;
     }
@@ -51,11 +57,12 @@ function Game() {
       try {
         const docSnap = await getDoc(gameRef);
         if (!docSnap.exists()) {
+          console.log("Criando um novo jogo...");
           const randomBlackCard = shuffle(cardsData.blackCards)[0];
           const initialPlayer = {
             name: user.displayName,
             score: 0,
-            whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // 10 cartas brancas para o jogador
+            whiteCards: shuffle(cardsData.whiteCards).slice(0, 10),
           };
 
           await setDoc(gameRef, {
@@ -80,6 +87,7 @@ function Game() {
             roundOver: false,
           });
         } else {
+          console.log("Jogo encontrado, carregando estado...");
           setGameState(docSnap.data());
           await addPlayerToGame();
         }
@@ -91,20 +99,30 @@ function Game() {
     initializeGame();
 
     const unsubscribe = onSnapshot(gameRef, (doc) => {
-      if (doc.exists()) setGameState(doc.data());
+      if (doc.exists()) {
+        console.log("Estado do jogo atualizado:", doc.data());
+        setGameState(doc.data());
+      }
     });
 
     return () => unsubscribe();
-  }, [navigate, user, addPlayerToGame]);
+  }, [navigate, user, addPlayerToGame, gameRef]);  // gameRef adicionado como dependência
+
+  if (!gameState) {
+    return <div>Carregando...</div>;  // Mensagem de loading enquanto o jogo está sendo carregado
+  }
 
   const playCard = async () => {
-    if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
+    if (!selectedCard || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    await updateDoc(gameRef, {
-      playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
-    });
-
-    setSelectedCard(null);
+    try {
+      await updateDoc(gameRef, {
+        playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
+      });
+      setSelectedCard(null);
+    } catch (error) {
+      console.error("Erro ao jogar carta:", error);
+    }
   };
 
   const chooseWinner = async (winningCard) => {
@@ -117,26 +135,30 @@ function Game() {
 
     const winner = Object.keys(updatedScores).find(player => updatedScores[player] >= 8);
 
-    if (winner) {
-      await updateDoc(gameRef, {
-        winner: winner,
-        scores: updatedScores,
-        playedCards: [],
-        roundOver: true,
-      });
-    } else {
-      const currentJudgeIndex = gameState.players.findIndex(player => player.name === gameState.judge);
-      const nextJudge = gameState.players[(currentJudgeIndex + 1) % gameState.players.length].name;
+    try {
+      if (winner) {
+        await updateDoc(gameRef, {
+          winner: winner,
+          scores: updatedScores,
+          playedCards: [],
+          roundOver: true,
+        });
+      } else {
+        const currentJudgeIndex = gameState.players.findIndex(player => player.name === gameState.judge);
+        const nextJudge = gameState.players[(currentJudgeIndex + 1) % gameState.players.length].name;
 
-      await updateDoc(gameRef, {
-        judge: nextJudge,
-        scores: updatedScores,
-        playedCards: [],
-        roundOver: true,
-      });
+        await updateDoc(gameRef, {
+          judge: nextJudge,
+          scores: updatedScores,
+          playedCards: [],
+          roundOver: true,
+        });
+      }
+
+      await removeCardFromPlayerDeck(winningCard.user, winningCard.card);
+    } catch (error) {
+      console.error("Erro ao escolher vencedor:", error);
     }
-
-    await removeCardFromPlayerDeck(winningCard.user, winningCard.card);
   };
 
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
@@ -147,9 +169,13 @@ function Game() {
       return p;
     });
 
-    await updateDoc(gameRef, {
-      players: updatedPlayers,
-    });
+    try {
+      await updateDoc(gameRef, {
+        players: updatedPlayers,
+      });
+    } catch (error) {
+      console.error("Erro ao remover carta do deck:", error);
+    }
   };
 
   const nextRound = async () => {
@@ -159,13 +185,17 @@ function Game() {
       return player;
     });
 
-    await updateDoc(gameRef, {
-      playedCards: [],
-      blackCard: randomBlackCard,
-      timer: 30,
-      roundOver: false,
-      players: updatedPlayers,
-    });
+    try {
+      await updateDoc(gameRef, {
+        playedCards: [],
+        blackCard: randomBlackCard,
+        timer: 30,
+        roundOver: false,
+        players: updatedPlayers,
+      });
+    } catch (error) {
+      console.error("Erro ao iniciar próxima rodada:", error);
+    }
   };
 
   const buyCards = async () => {
@@ -175,9 +205,13 @@ function Game() {
       return player;
     });
 
-    await updateDoc(gameRef, {
-      players: updatedPlayers,
-    });
+    try {
+      await updateDoc(gameRef, {
+        players: updatedPlayers,
+      });
+    } catch (error) {
+      console.error("Erro ao comprar cartas:", error);
+    }
   };
 
   return (
