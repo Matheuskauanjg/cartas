@@ -98,7 +98,13 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    await removePlayedCard("game-room-1", user, selectedCard, gameState); // Usa a função do serviço para remover a carta
+    // Adiciona a carta ao banco de dados (não remove até o juiz escolher a vencedora)
+    await updateDoc(doc(db, "games", "game-room-1"), {
+      playedCards: [
+        ...gameState.playedCards,
+        { card: selectedCard, user: user.displayName },
+      ],
+    });
 
     setSelectedCard(null); // Limpa a carta selecionada após jogar
   };
@@ -116,6 +122,7 @@ function Game() {
     const winner = Object.keys(updatedScores).find(player => updatedScores[player] >= 8);
 
     if (winner) {
+      // Atualiza os dados e marca o vencedor da partida
       await updateDoc(gameRef, {
         winner: winner,
         scores: updatedScores,
@@ -123,6 +130,7 @@ function Game() {
         roundOver: true,
       });
     } else {
+      // Troca o juiz e passa a vez
       const currentJudgeIndex = gameState.players.findIndex(player => player.name === gameState.judge);
       const nextJudge = gameState.players[(currentJudgeIndex + 1) % gameState.players.length].name;
 
