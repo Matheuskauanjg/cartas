@@ -8,7 +8,11 @@ function Game() {
   const [gameState, setGameState] = useState({
     blackCard: "",
     whiteCards: [],
-    playedCards: [] // Inicializa playedCards como array vazio
+    playedCards: [],
+    scores: {},
+    judge: "", // Jogador que é o juiz da rodada
+    winner: null,
+    players: [] // Lista de jogadores
   });
   const [selectedCard, setSelectedCard] = useState(null);
   const navigate = useNavigate();
@@ -22,16 +26,16 @@ function Game() {
 
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Verificar se o documento já existe
     const fetchGameState = async () => {
       const docSnap = await getDoc(gameRef);
 
       if (!docSnap.exists()) {
-        // Se o documento não existe, cria um novo documento com as cartas iniciais
         const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
         const randomWhiteCards = [...cardsData.whiteCards]
           .sort(() => 0.5 - Math.random())
-          .slice(0, 5);
+          .slice(0, 10); // Distribuindo 10 cartas brancas para cada jogador
+
+        const initialPlayers = [{ name: user.displayName, score: 0 }];
 
         await setDoc(gameRef, {
           blackCard: randomBlackCard,
@@ -40,28 +44,31 @@ function Game() {
           scores: {},
           judge: user.displayName,
           winner: null,
+          players: initialPlayers,
         });
 
         setGameState({
           blackCard: randomBlackCard,
           whiteCards: randomWhiteCards,
           playedCards: [],
+          scores: {},
+          judge: user.displayName,
+          winner: null,
+          players: initialPlayers,
         });
       } else {
-        // Se o documento já existe, atualiza o estado com os dados do Firestore
         setGameState(docSnap.data());
       }
     };
 
     fetchGameState();
 
-    // Inscrição para ouvir mudanças no documento
     const unsubscribe = onSnapshot(gameRef, (doc) => {
       if (doc.exists()) {
         setGameState((prevState) => ({
           ...prevState,
           ...doc.data(),
-          playedCards: doc.data()?.playedCards || []
+          playedCards: doc.data()?.playedCards || [],
         }));
       }
     });
@@ -73,7 +80,6 @@ function Game() {
     if (!selectedCard || !gameState) return;
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Garantir que playedCards seja um array antes de adicionar
     await updateDoc(gameRef, {
       playedCards: [...(gameState.playedCards || []), { user: user.displayName, card: selectedCard }]
     });
@@ -84,19 +90,38 @@ function Game() {
   const chooseWinner = async (winningCard) => {
     if (!gameState || gameState.judge !== user.displayName) return;
     const gameRef = doc(db, "games", "game-room-1");
-    await updateDoc(gameRef, {
-      winner: winningCard.user,
-      scores: {
-        ...gameState.scores,
-        [winningCard.user]: (gameState.scores[winningCard.user] || 0) + 1,
-      },
-      playedCards: [], // Limpar as cartas jogadas após escolher o vencedor
-    });
+
+    // Incrementa a pontuação do jogador vencedor
+    const updatedScores = {
+      ...gameState.scores,
+      [winningCard.user]: (gameState.scores[winningCard.user] || 0) + 1,
+    };
+
+    // Verifica se algum jogador alcançou 8 pontos e encerra o jogo
+    const winner = Object.keys(updatedScores).find(player => updatedScores[player] >= 8);
+
+    if (winner) {
+      await updateDoc(gameRef, {
+        winner: winner,
+        scores: updatedScores,
+        playedCards: [],
+      });
+    } else {
+      // Passa para o próximo juiz (jogador à esquerda)
+      const currentJudgeIndex = gameState.players.findIndex(player => player.name === gameState.judge);
+      const nextJudge = gameState.players[(currentJudgeIndex + 1) % gameState.players.length].name;
+
+      await updateDoc(gameRef, {
+        judge: nextJudge,
+        scores: updatedScores,
+        playedCards: [],
+      });
+    }
   };
 
   return (
     <div>
-      <h1>Jogo</h1>
+      <h1>Jogo - Cartas Contra a Humanidade</h1>
       {gameState && <h2>Pergunta: {gameState.blackCard}</h2>}
       <div>
         <h3>Suas cartas:</h3>
@@ -116,6 +141,12 @@ function Game() {
               {card.card} - {card.user}
             </button>
           ))}
+        </div>
+      )}
+
+      {gameState?.winner && (
+        <div>
+          <h2>Parabéns, {gameState.winner} venceu!</h2>
         </div>
       )}
     </div>
