@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
-import { removePlayedCard } from "../services/cardService"; // Importa a função do serviço
 import cardsData from "../data/cards.json";
 
 function Game() {
@@ -98,8 +97,10 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Usa a função do serviço para remover a carta (se ela for escolhida pelo juiz)
-    await removePlayedCard("game-room-1", user, selectedCard, gameState); 
+    // Adiciona a carta jogada ao Firestore (sem remover até ser escolhida)
+    await updateDoc(doc(db, "games", "game-room-1"), {
+      playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
+    });
 
     setSelectedCard(null); // Limpa a carta selecionada após jogar
   };
