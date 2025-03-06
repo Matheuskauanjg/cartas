@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
-import { removeCardFromPlayerDeck } from "../services/cardService"; // Importa a função do serviço
 import cardsData from "../data/cards.json";
 
 function Game() {
@@ -141,7 +140,19 @@ function Game() {
     }
 
     // Remover a carta do deck do jogador que foi escolhida
-    await removeCardFromPlayerDeck(gameState.playedCards, winningCard.user, winningCard.card, gameState);
+    await removeCardFromPlayerDeck(winningCard.user, winningCard.card);
+  };
+
+  const removeCardFromPlayerDeck = async (player, selectedCard) => {
+    const gameRef = doc(db, "games", "game-room-1");
+
+    // Encontra as cartas brancas do jogador
+    const playerDeck = gameState.whiteCards.filter(card => card !== selectedCard);
+
+    await updateDoc(gameRef, {
+      whiteCards: playerDeck,  // Remove a carta do deck do jogador
+      playedCards: gameState.playedCards.filter(card => card.card !== selectedCard),
+    });
   };
 
   const nextRound = async () => {
