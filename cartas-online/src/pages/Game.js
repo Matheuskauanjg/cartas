@@ -87,6 +87,7 @@ function Game() {
     const unsubscribe = onSnapshot(gameRef, (doc) => {
       if (doc.exists()) {
         const gameData = doc.data();
+        console.log("Estado do jogo atualizado:", gameData);
         setGameState({
           ...gameData,
           players: gameData.players || [], // Garante que 'players' existe
