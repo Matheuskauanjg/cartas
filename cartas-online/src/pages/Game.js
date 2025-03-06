@@ -98,7 +98,8 @@ function Game() {
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    await removePlayedCard("game-room-1", user, selectedCard, gameState); // Usa a função do serviço para remover a carta
+    // Usa a função do serviço para remover a carta (se ela for escolhida pelo juiz)
+    await removePlayedCard("game-room-1", user, selectedCard, gameState); 
 
     setSelectedCard(null); // Limpa a carta selecionada após jogar
   };
