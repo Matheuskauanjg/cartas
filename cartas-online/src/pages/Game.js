@@ -36,12 +36,12 @@ function Game() {
 
           const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
-          // Inicializa os jogadores e distribui as cartas
+          // Inicializa os jogadores e distribui as cartas (8 cartas por jogador)
           const initialPlayers = [
             { 
               name: user.displayName, 
               score: 0, 
-              whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // 10 cartas brancas para o jogador
+              whiteCards: shuffle(cardsData.whiteCards).slice(0, 8), // Agora são 8 cartas
             },
           ];
 
@@ -74,8 +74,13 @@ function Game() {
           const gameData = docSnap.data();
           setGameState({
             ...gameData,
-            players: gameData.players || [], // Garante que 'players' existe
+            players: gameData.players || [],
           });
+
+          // Adiciona o jogador atual ao jogo se ele ainda não estiver na lista
+          if (!gameData.players.some(p => p.name === user.displayName)) {
+            await addPlayerToGame();
+          }
         }
       } catch (error) {
         console.error("Erro ao buscar o estado do jogo:", error);
@@ -90,7 +95,7 @@ function Game() {
         console.log("Estado do jogo atualizado:", gameData);
         setGameState({
           ...gameData,
-          players: gameData.players || [], // Garante que 'players' existe
+          players: gameData.players || [],
         });
       }
     });
@@ -100,6 +105,20 @@ function Game() {
 
   const shuffle = (array) => {
     return array.sort(() => Math.random() - 0.5);
+  };
+
+  const addPlayerToGame = async () => {
+    const gameRef = doc(db, "games", "game-room-1");
+
+    const newPlayer = {
+      name: user.displayName,
+      score: 0,
+      whiteCards: shuffle(cardsData.whiteCards).slice(0, 8), // Dá 8 cartas ao jogador novo
+    };
+
+    await updateDoc(gameRef, {
+      players: [...gameState.players, newPlayer],
+    });
   };
 
   const playCard = async () => {
@@ -152,33 +171,12 @@ function Game() {
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
     const gameRef = doc(db, "games", "game-room-1");
 
-    const updatedPlayers = gameState.players.map((p) => {
-      if (p.name === player) {
-        p.whiteCards = p.whiteCards?.filter((card) => card !== selectedCard) || [];
-      }
-      return p;
-    });
+    const updatedPlayers = gameState.players.map((p) => ({
+      ...p,
+      whiteCards: p.name === player ? p.whiteCards.filter((card) => card !== selectedCard) : p.whiteCards,
+    }));
 
     await updateDoc(gameRef, {
-      players: updatedPlayers,
-    });
-  };
-
-  const nextRound = async () => {
-    const gameRef = doc(db, "games", "game-room-1");
-
-    const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-
-    const updatedPlayers = gameState.players.map((player) => {
-      player.whiteCards = shuffle(cardsData.whiteCards.slice(0, 10)); // Distribui novas cartas
-      return player;
-    });
-
-    await updateDoc(gameRef, {
-      playedCards: [],
-      blackCard: randomBlackCard,
-      timer: 30,
-      roundOver: false,
       players: updatedPlayers,
     });
   };
@@ -187,9 +185,9 @@ function Game() {
     const gameRef = doc(db, "games", "game-room-1");
 
     const updatedPlayers = gameState.players.map((player) => {
-      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0)));
-      player.whiteCards = [...(player.whiteCards || []), ...newCards];
-      return player;
+      const missingCards = 8 - (player.whiteCards?.length || 0);
+      const newCards = missingCards > 0 ? shuffle(cardsData.whiteCards).slice(0, missingCards) : [];
+      return { ...player, whiteCards: [...(player.whiteCards || []), ...newCards] };
     });
 
     await updateDoc(gameRef, {
@@ -216,45 +214,13 @@ function Game() {
         ))}
       </div>
 
-      {gameState.timer > 0 && !gameState.roundOver ? (
-        <div>
-          <p>Tempo restante: {gameState.timer}s</p>
-        </div>
-      ) : gameState.roundOver ? (
-        <div>
-          <p>Rodada terminada!</p>
-          {gameState.winner && <h3>Vencedor da rodada: {gameState.winner}</h3>}
-        </div>
-      ) : (
-        <div>
-          <p>Tempo esgotado!</p>
-        </div>
-      )}
-
       <button onClick={playCard} disabled={!selectedCard || gameState.judge === user.displayName || gameState.roundOver}>
         Jogar Carta
       </button>
 
-      {gameState?.judge === user.displayName && !gameState.roundOver && (
-        <div>
-          <h3>Escolha a melhor resposta:</h3>
-          {gameState?.playedCards?.map((card, index) => (
-            <button key={index} onClick={() => chooseWinner(card)}>
-              {card.card} - {card.user}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <button onClick={nextRound} disabled={!gameState.roundOver || gameState.judge !== user.displayName}>
-        Próxima Rodada
-      </button>
-
-      <button onClick={buyCards} disabled={gameState.whiteCards?.length >= 5 || gameState.roundOver}>
+      <button onClick={buyCards} disabled={gameState.players.some(p => p.name === user.displayName && p.whiteCards.length >= 8)}>
         Comprar Cartas
       </button>
-
-      {gameState.winner && <h2>{gameState.winner} venceu a partida!</h2>}
     </div>
   );
 }
