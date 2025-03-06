@@ -77,11 +77,11 @@ function Game() {
 
     const unsubscribe = onSnapshot(gameRef, (doc) => {
       if (doc.exists()) {
-        setGameState((prevState) => ({
-          ...prevState,
-          ...doc.data(),
-          playedCards: doc.data()?.playedCards || [],
-        }));
+        const gameData = doc.data();
+        setGameState({
+          ...gameData,
+          players: gameData.players || [], // Garante que 'players' existe
+        });
       }
     });
 
