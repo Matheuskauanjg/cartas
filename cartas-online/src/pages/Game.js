@@ -5,44 +5,36 @@ import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
 import cardsData from "../data/cards.json";
 
 function Game() {
-  const [gameState, setGameState] = useState({
-    blackCard: "",
-    playedCards: [],
-    scores: {},
-    judge: "",
-    winner: null,
-    players: [],
-    timer: 30,
-    roundOver: false,
-  });
+  const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const navigate = useNavigate();
   const user = auth.currentUser;
-
   const gameRef = doc(db, "games", "game-room-1");
 
-  const shuffle = (array) => {
-    return array.sort(() => Math.random() - 0.5);
-  };
+  const shuffle = (array) => array.sort(() => Math.random() - 0.5);
 
   const addPlayerToGame = useCallback(async () => {
+    if (!user) return;
+
     try {
       const gameSnap = await getDoc(gameRef);
-      if (gameSnap.exists()) {
-        const gameData = gameSnap.data();
-        const currentPlayers = gameData.players || [];
+      if (!gameSnap.exists()) return;
 
-        if (!currentPlayers.some((p) => p.name === user.displayName)) {
-          const newPlayer = {
-            name: user.displayName,
-            score: 0,
-            whiteCards: shuffle(cardsData.whiteCards).slice(0, 8),
-          };
+      const gameData = gameSnap.data();
+      const currentPlayers = gameData.players || [];
+      const existingPlayer = currentPlayers.find(p => p.name === user.displayName);
 
-          await updateDoc(gameRef, {
-            players: [...currentPlayers, newPlayer], // Garante que não sobrescrevemos jogadores existentes
-          });
-        }
+      if (!existingPlayer) {
+        const newPlayer = {
+          name: user.displayName,
+          score: 0,
+          whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // Cada jogador recebe 10 cartas no início
+        };
+
+        await updateDoc(gameRef, { players: [...currentPlayers, newPlayer] });
+      } else if (!existingPlayer.whiteCards || existingPlayer.whiteCards.length === 0) {
+        existingPlayer.whiteCards = shuffle(cardsData.whiteCards).slice(0, 10);
+        await updateDoc(gameRef, { players: currentPlayers });
       }
     } catch (error) {
       console.error("Erro ao adicionar jogador:", error);
@@ -55,22 +47,16 @@ function Game() {
       return;
     }
 
-    const fetchGameState = async () => {
+    const initializeGame = async () => {
       try {
         const docSnap = await getDoc(gameRef);
-
         if (!docSnap.exists()) {
-          console.log("Jogo não encontrado, criando novo jogo...");
-
-          const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-
-          const initialPlayers = [
-            { 
-              name: user.displayName, 
-              score: 0, 
-              whiteCards: shuffle(cardsData.whiteCards).slice(0, 8),
-            },
-          ];
+          const randomBlackCard = shuffle(cardsData.blackCards)[0];
+          const initialPlayer = {
+            name: user.displayName,
+            score: 0,
+            whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // 10 cartas brancas para o jogador
+          };
 
           await setDoc(gameRef, {
             blackCard: randomBlackCard,
@@ -78,7 +64,7 @@ function Game() {
             scores: {},
             judge: user.displayName,
             winner: null,
-            players: initialPlayers,
+            players: [initialPlayer],
             timer: 30,
             roundOver: false,
           });
@@ -89,33 +75,23 @@ function Game() {
             scores: {},
             judge: user.displayName,
             winner: null,
-            players: initialPlayers,
+            players: [initialPlayer],
             timer: 30,
             roundOver: false,
           });
         } else {
-          const gameData = docSnap.data();
-          setGameState({
-            ...gameData,
-            players: gameData.players || [],
-          });
-
-          await addPlayerToGame(); // Agora garantimos que novos jogadores entrem corretamente
+          setGameState(docSnap.data());
+          await addPlayerToGame();
         }
       } catch (error) {
         console.error("Erro ao buscar o estado do jogo:", error);
       }
     };
 
-    fetchGameState();
+    initializeGame();
 
     const unsubscribe = onSnapshot(gameRef, (doc) => {
-      if (doc.exists()) {
-        setGameState({
-          ...doc.data(),
-          players: doc.data().players || [],
-        });
-      }
+      if (doc.exists()) setGameState(doc.data());
     });
 
     return () => unsubscribe();
@@ -125,10 +101,7 @@ function Game() {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
     await updateDoc(gameRef, {
-      playedCards: [
-        ...gameState.playedCards,
-        { card: selectedCard, user: user.displayName },
-      ],
+      playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
     });
 
     setSelectedCard(null);
@@ -167,21 +140,39 @@ function Game() {
   };
 
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
-    const updatedPlayers = gameState.players.map((p) => ({
-      ...p,
-      whiteCards: p.name === player ? p.whiteCards.filter((card) => card !== selectedCard) : p.whiteCards,
-    }));
+    const updatedPlayers = gameState.players.map((p) => {
+      if (p.name === player) {
+        p.whiteCards = p.whiteCards?.filter((card) => card !== selectedCard) || [];
+      }
+      return p;
+    });
 
     await updateDoc(gameRef, {
       players: updatedPlayers,
     });
   };
 
+  const nextRound = async () => {
+    const randomBlackCard = shuffle(cardsData.blackCards)[0];
+    const updatedPlayers = gameState.players.map((player) => {
+      player.whiteCards = shuffle(cardsData.whiteCards).slice(0, 10); // Distribui novas cartas
+      return player;
+    });
+
+    await updateDoc(gameRef, {
+      playedCards: [],
+      blackCard: randomBlackCard,
+      timer: 30,
+      roundOver: false,
+      players: updatedPlayers,
+    });
+  };
+
   const buyCards = async () => {
     const updatedPlayers = gameState.players.map((player) => {
-      const missingCards = 8 - (player.whiteCards?.length || 0);
-      const newCards = missingCards > 0 ? shuffle(cardsData.whiteCards).slice(0, missingCards) : [];
-      return { ...player, whiteCards: [...(player.whiteCards || []), ...newCards] };
+      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0)));
+      player.whiteCards = [...(player.whiteCards || []), ...newCards];
+      return player;
     });
 
     await updateDoc(gameRef, {
@@ -208,13 +199,45 @@ function Game() {
         ))}
       </div>
 
+      {gameState.timer > 0 && !gameState.roundOver ? (
+        <div>
+          <p>Tempo restante: {gameState.timer}s</p>
+        </div>
+      ) : gameState.roundOver ? (
+        <div>
+          <p>Rodada terminada!</p>
+          {gameState.winner && <h3>Vencedor da rodada: {gameState.winner}</h3>}
+        </div>
+      ) : (
+        <div>
+          <p>Tempo esgotado!</p>
+        </div>
+      )}
+
       <button onClick={playCard} disabled={!selectedCard || gameState.judge === user.displayName || gameState.roundOver}>
         Jogar Carta
       </button>
 
-      <button onClick={buyCards} disabled={gameState.players.some(p => p.name === user.displayName && p.whiteCards.length >= 8)}>
+      {gameState?.judge === user.displayName && !gameState.roundOver && (
+        <div>
+          <h3>Escolha a melhor resposta:</h3>
+          {gameState?.playedCards?.map((card, index) => (
+            <button key={index} onClick={() => chooseWinner(card)}>
+              {card.card} - {card.user}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button onClick={nextRound} disabled={!gameState.roundOver || gameState.judge !== user.displayName}>
+        Próxima Rodada
+      </button>
+
+      <button onClick={buyCards} disabled={gameState.whiteCards?.length >= 5 || gameState.roundOver}>
         Comprar Cartas
       </button>
+
+      {gameState.winner && <h2>{gameState.winner} venceu a partida!</h2>}
     </div>
   );
 }
