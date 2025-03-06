@@ -7,7 +7,6 @@ import cardsData from "../data/cards.json";
 function Game() {
   const [gameState, setGameState] = useState({
     blackCard: "",
-    whiteCards: [],
     playedCards: [],
     scores: {},
     judge: "",
@@ -33,14 +32,10 @@ function Game() {
 
       if (!docSnap.exists()) {
         const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
-        const randomWhiteCards = [...cardsData.whiteCards]
-          .sort(() => 0.5 - Math.random())
-          .slice(0, 10); // Distribuindo 10 cartas brancas para cada jogador
+        const initialPlayers = [{ name: user.displayName, score: 0, whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) }]; // Deck inicial de cartas brancas
 
-        const initialPlayers = [{ name: user.displayName, score: 0 }];
         await setDoc(gameRef, {
           blackCard: randomBlackCard,
-          whiteCards: randomWhiteCards,
           playedCards: [],
           scores: {},
           judge: user.displayName,
@@ -52,7 +47,6 @@ function Game() {
 
         setGameState({
           blackCard: randomBlackCard,
-          whiteCards: randomWhiteCards,
           playedCards: [],
           scores: {},
           judge: user.displayName,
@@ -81,23 +75,14 @@ function Game() {
     return () => unsubscribe();
   }, [navigate, user]);
 
-  useEffect(() => {
-    if (gameState.timer === 0 || gameState.judge === user.displayName || gameState.roundOver) return;
-
-    const timerInterval = setInterval(() => {
-      setGameState((prevState) => ({
-        ...prevState,
-        timer: prevState.timer - 1,
-      }));
-    }, 1000);
-
-    return () => clearInterval(timerInterval);
-  }, [gameState.timer, gameState.judge, user, gameState.roundOver]);
+  const shuffle = (array) => {
+    return array.sort(() => Math.random() - 0.5);
+  };
 
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    // Adiciona a carta ao banco de dados
+    // Envia a carta jogada para o banco de dados
     await updateDoc(doc(db, "games", "game-room-1"), {
       playedCards: [
         ...gameState.playedCards,
@@ -146,12 +131,16 @@ function Game() {
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
     const gameRef = doc(db, "games", "game-room-1");
 
-    // Encontra as cartas brancas do jogador
-    const playerDeck = gameState.whiteCards.filter(card => card !== selectedCard);
+    // Encontra o jogador e remove a carta escolhida do seu deck
+    const updatedPlayers = gameState.players.map((p) => {
+      if (p.name === player) {
+        p.whiteCards = p.whiteCards.filter((card) => card !== selectedCard); // Remove a carta do deck do jogador
+      }
+      return p;
+    });
 
     await updateDoc(gameRef, {
-      whiteCards: playerDeck,  // Remove a carta do deck do jogador
-      playedCards: gameState.playedCards.filter(card => card.card !== selectedCard),
+      players: updatedPlayers, // Atualiza os decks dos jogadores no banco de dados
     });
   };
 
@@ -160,20 +149,32 @@ function Game() {
 
     const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
+    // Distribui novas cartas brancas para todos os jogadores
+    const updatedPlayers = gameState.players.map((player) => {
+      player.whiteCards = shuffle(cardsData.whiteCards.slice(0, 10)); // Nova distribuição de cartas brancas
+      return player;
+    });
+
     await updateDoc(gameRef, {
       playedCards: [],
-      blackCard: randomBlackCard,  // Atualiza a carta preta
+      blackCard: randomBlackCard,
       timer: 30,
       roundOver: false,
+      players: updatedPlayers, // Atualiza os decks dos jogadores
     });
   };
 
   const buyCards = async () => {
     const gameRef = doc(db, "games", "game-room-1");
-    const randomWhiteCards = [...cardsData.whiteCards].sort(() => 0.5 - Math.random()).slice(0, 5 - gameState.whiteCards.length);
+
+    const updatedPlayers = gameState.players.map((player) => {
+      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - player.whiteCards.length));
+      player.whiteCards = [...player.whiteCards, ...newCards];
+      return player;
+    });
 
     await updateDoc(gameRef, {
-      whiteCards: [...gameState.whiteCards, ...randomWhiteCards],
+      players: updatedPlayers, // Atualiza o deck de cada jogador
     });
   };
 
@@ -183,11 +184,15 @@ function Game() {
       {gameState && <h2>Pergunta: {gameState.blackCard}</h2>}
       <div>
         <h3>Suas cartas:</h3>
-        {gameState?.whiteCards?.map((card, index) => (
-          gameState.judge !== user.displayName && !gameState.roundOver && (
-            <button key={index} onClick={() => setSelectedCard(card)}>
-              {card}
-            </button>
+        {gameState?.players?.map((player, index) => (
+          player.name === user.displayName && gameState.judge !== user.displayName && !gameState.roundOver && (
+            <div key={index}>
+              {player.whiteCards.map((card, idx) => (
+                <button key={idx} onClick={() => setSelectedCard(card)}>
+                  {card}
+                </button>
+              ))}
+            </div>
           )
         ))}
       </div>
