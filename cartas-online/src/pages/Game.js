@@ -110,6 +110,7 @@ function Game() {
       playedCards: [...(gameState.playedCards || []), { user: user.displayName, card: selectedCard }],
     });
 
+    // Atualizar o estado local com as cartas restantes
     setSelectedCard(null);
   };
 
