@@ -28,48 +28,57 @@ function Game() {
     const gameRef = doc(db, "games", "game-room-1");
 
     const fetchGameState = async () => {
-      const docSnap = await getDoc(gameRef);
+      try {
+        const docSnap = await getDoc(gameRef);
 
-      if (!docSnap.exists()) {
-        const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
+        if (!docSnap.exists()) {
+          console.log("Jogo não encontrado, criando novo jogo...");
 
-        // Inicializa os jogadores e distribui as cartas
-        const initialPlayers = [
-          { 
-            name: user.displayName, 
-            score: 0, 
-            whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // 10 cartas brancas para o jogador
-          },
-        ];
+          const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
-        // Cria o estado inicial do jogo no Firebase
-        await setDoc(gameRef, {
-          blackCard: randomBlackCard,
-          playedCards: [],
-          scores: {},
-          judge: user.displayName,
-          winner: null,
-          players: initialPlayers,
-          timer: 30,
-          roundOver: false,
-        });
+          // Inicializa os jogadores e distribui as cartas
+          const initialPlayers = [
+            { 
+              name: user.displayName, 
+              score: 0, 
+              whiteCards: shuffle(cardsData.whiteCards.slice(0, 10)) // 10 cartas brancas para o jogador
+            },
+          ];
 
-        setGameState({
-          blackCard: randomBlackCard,
-          playedCards: [],
-          scores: {},
-          judge: user.displayName,
-          winner: null,
-          players: initialPlayers,
-          timer: 30,
-          roundOver: false,
-        });
-      } else {
-        const gameData = docSnap.data();
-        setGameState({
-          ...gameData,
-          players: gameData.players || [], // Garante que 'players' existe
-        });
+          // Cria o estado inicial do jogo no Firebase
+          await setDoc(gameRef, {
+            blackCard: randomBlackCard,
+            playedCards: [],
+            scores: {},
+            judge: user.displayName,
+            winner: null,
+            players: initialPlayers,
+            timer: 30,
+            roundOver: false,
+          });
+
+          console.log("Jogo criado no Firebase:", initialPlayers);
+
+          setGameState({
+            blackCard: randomBlackCard,
+            playedCards: [],
+            scores: {},
+            judge: user.displayName,
+            winner: null,
+            players: initialPlayers,
+            timer: 30,
+            roundOver: false,
+          });
+        } else {
+          console.log("Jogo encontrado no Firebase", docSnap.data());
+          const gameData = docSnap.data();
+          setGameState({
+            ...gameData,
+            players: gameData.players || [], // Garante que 'players' existe
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao buscar o estado do jogo:", error);
       }
     };
 
