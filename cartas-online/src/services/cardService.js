@@ -1,26 +1,27 @@
 import { updateDoc, doc } from "firebase/firestore";
 
-/**
- * Remove a carta escolhida pelo juiz do deck do jogador.
- * 
- * @param {Array} playedCards - Cartas jogadas na rodada.
- * @param {string} player - Nome do jogador que jogou a carta.
- * @param {string} selectedCard - Carta escolhida pelo juiz.
- * @param {object} gameState - Estado atual do jogo.
- */
-export const removeCardFromPlayerDeck = async (playedCards, player, selectedCard, gameState) => {
-  const gameRef = doc(gameState.db, "games", "game-room-1");
+// Função para remover uma carta do jogador e atualizar o estado no Firestore
+export const removePlayedCard = async (gameRoom, user, selectedCard, gameState) => {
+  const gameRef = doc(gameState.db, "games", gameRoom);
 
-  // Encontra a carta jogada que corresponde à carta escolhida pelo juiz
-  const cardToRemove = playedCards.find(card => card.card === selectedCard && card.user === player);
+  // Remove a carta jogada do deck do jogador
+  const newWhiteCards = gameState.whiteCards.filter(card => card !== selectedCard);
 
-  if (cardToRemove) {
-    // Atualiza o deck do jogador, removendo a carta escolhida
-    const updatedWhiteCards = gameState.whiteCards.filter(card => card !== selectedCard);
+  // Atualiza o deck e adiciona a carta jogada no banco de dados
+  await updateDoc(gameRef, {
+    whiteCards: newWhiteCards,
+    playedCards: [...gameState.playedCards, { card: selectedCard, user: user.displayName }],
+  });
+};
 
-    await updateDoc(gameRef, {
-      whiteCards: updatedWhiteCards,  // Remove a carta do deck do jogador
-      playedCards: gameState.playedCards.filter(card => card !== cardToRemove),  // Remove a carta jogada do histórico de cartas jogadas
-    });
-  }
+// Função para garantir que as cartas escolhidas pelo juiz não voltem ao deck
+export const removeJudgeChosenCard = async (gameRoom, gameState, judgeChosenCard) => {
+  const gameRef = doc(gameState.db, "games", gameRoom);
+
+  // Remove a carta escolhida pelo juiz do deck do jogador
+  const newWhiteCards = gameState.whiteCards.filter(card => card !== judgeChosenCard);
+
+  await updateDoc(gameRef, {
+    whiteCards: newWhiteCards,
+  });
 };

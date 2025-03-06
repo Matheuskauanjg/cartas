@@ -222,7 +222,7 @@ function Game() {
         </div>
       )}
 
-      <button onClick={nextRound} disabled={!gameState.roundOver}>
+      <button onClick={nextRound} disabled={!gameState.roundOver || gameState.judge !== user.displayName}>
         Próxima Rodada
       </button>
 
