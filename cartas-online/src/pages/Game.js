@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
@@ -19,13 +19,41 @@ function Game() {
   const navigate = useNavigate();
   const user = auth.currentUser;
 
+  const gameRef = doc(db, "games", "game-room-1");
+
+  const shuffle = (array) => {
+    return array.sort(() => Math.random() - 0.5);
+  };
+
+  const addPlayerToGame = useCallback(async () => {
+    try {
+      const gameSnap = await getDoc(gameRef);
+      if (gameSnap.exists()) {
+        const gameData = gameSnap.data();
+        const currentPlayers = gameData.players || [];
+
+        if (!currentPlayers.some((p) => p.name === user.displayName)) {
+          const newPlayer = {
+            name: user.displayName,
+            score: 0,
+            whiteCards: shuffle(cardsData.whiteCards).slice(0, 8),
+          };
+
+          await updateDoc(gameRef, {
+            players: [...currentPlayers, newPlayer], // Garante que não sobrescrevemos jogadores existentes
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar jogador:", error);
+    }
+  }, [gameRef, user]);
+
   useEffect(() => {
     if (!user) {
       navigate("/login");
       return;
     }
-
-    const gameRef = doc(db, "games", "game-room-1");
 
     const fetchGameState = async () => {
       try {
@@ -36,16 +64,14 @@ function Game() {
 
           const randomBlackCard = cardsData.blackCards[Math.floor(Math.random() * cardsData.blackCards.length)];
 
-          // Inicializa os jogadores e distribui as cartas (8 cartas por jogador)
           const initialPlayers = [
             { 
               name: user.displayName, 
               score: 0, 
-              whiteCards: shuffle(cardsData.whiteCards).slice(0, 8), // Agora são 8 cartas
+              whiteCards: shuffle(cardsData.whiteCards).slice(0, 8),
             },
           ];
 
-          // Cria o estado inicial do jogo no Firebase
           await setDoc(gameRef, {
             blackCard: randomBlackCard,
             playedCards: [],
@@ -56,8 +82,6 @@ function Game() {
             timer: 30,
             roundOver: false,
           });
-
-          console.log("Jogo criado no Firebase:", initialPlayers);
 
           setGameState({
             blackCard: randomBlackCard,
@@ -70,17 +94,13 @@ function Game() {
             roundOver: false,
           });
         } else {
-          console.log("Jogo encontrado no Firebase", docSnap.data());
           const gameData = docSnap.data();
           setGameState({
             ...gameData,
             players: gameData.players || [],
           });
 
-          // Adiciona o jogador atual ao jogo se ele ainda não estiver na lista
-          if (!gameData.players.some(p => p.name === user.displayName)) {
-            await addPlayerToGame();
-          }
+          await addPlayerToGame(); // Agora garantimos que novos jogadores entrem corretamente
         }
       } catch (error) {
         console.error("Erro ao buscar o estado do jogo:", error);
@@ -91,40 +111,20 @@ function Game() {
 
     const unsubscribe = onSnapshot(gameRef, (doc) => {
       if (doc.exists()) {
-        const gameData = doc.data();
-        console.log("Estado do jogo atualizado:", gameData);
         setGameState({
-          ...gameData,
-          players: gameData.players || [],
+          ...doc.data(),
+          players: doc.data().players || [],
         });
       }
     });
 
     return () => unsubscribe();
-  }, [navigate, user]);
-
-  const shuffle = (array) => {
-    return array.sort(() => Math.random() - 0.5);
-  };
-
-  const addPlayerToGame = async () => {
-    const gameRef = doc(db, "games", "game-room-1");
-
-    const newPlayer = {
-      name: user.displayName,
-      score: 0,
-      whiteCards: shuffle(cardsData.whiteCards).slice(0, 8), // Dá 8 cartas ao jogador novo
-    };
-
-    await updateDoc(gameRef, {
-      players: [...gameState.players, newPlayer],
-    });
-  };
+  }, [navigate, user, addPlayerToGame]);
 
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName || gameState.roundOver) return;
 
-    await updateDoc(doc(db, "games", "game-room-1"), {
+    await updateDoc(gameRef, {
       playedCards: [
         ...gameState.playedCards,
         { card: selectedCard, user: user.displayName },
@@ -136,8 +136,6 @@ function Game() {
 
   const chooseWinner = async (winningCard) => {
     if (!gameState || gameState.judge !== user.displayName) return;
-
-    const gameRef = doc(db, "games", "game-room-1");
 
     const updatedScores = {
       ...gameState.scores,
@@ -169,8 +167,6 @@ function Game() {
   };
 
   const removeCardFromPlayerDeck = async (player, selectedCard) => {
-    const gameRef = doc(db, "games", "game-room-1");
-
     const updatedPlayers = gameState.players.map((p) => ({
       ...p,
       whiteCards: p.name === player ? p.whiteCards.filter((card) => card !== selectedCard) : p.whiteCards,
@@ -182,8 +178,6 @@ function Game() {
   };
 
   const buyCards = async () => {
-    const gameRef = doc(db, "games", "game-room-1");
-
     const updatedPlayers = gameState.players.map((player) => {
       const missingCards = 8 - (player.whiteCards?.length || 0);
       const newCards = missingCards > 0 ? shuffle(cardsData.whiteCards).slice(0, missingCards) : [];
