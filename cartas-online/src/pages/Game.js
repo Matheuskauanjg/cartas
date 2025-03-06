@@ -12,7 +12,8 @@ function Game() {
     scores: {},
     judge: "", // Jogador que é o juiz da rodada
     winner: null,
-    players: [] // Lista de jogadores
+    players: [], // Lista de jogadores
+    timer: 30, // Temporizador de 30 segundos
   });
   const [selectedCard, setSelectedCard] = useState(null);
   const navigate = useNavigate();
@@ -36,7 +37,6 @@ function Game() {
           .slice(0, 10); // Distribuindo 10 cartas brancas para cada jogador
 
         const initialPlayers = [{ name: user.displayName, score: 0 }];
-
         await setDoc(gameRef, {
           blackCard: randomBlackCard,
           whiteCards: randomWhiteCards,
@@ -45,6 +45,7 @@ function Game() {
           judge: user.displayName,
           winner: null,
           players: initialPlayers,
+          timer: 30,
         });
 
         setGameState({
@@ -55,6 +56,7 @@ function Game() {
           judge: user.displayName,
           winner: null,
           players: initialPlayers,
+          timer: 30,
         });
       } else {
         setGameState(docSnap.data());
@@ -76,17 +78,34 @@ function Game() {
     return () => unsubscribe();
   }, [navigate, user]);
 
+  // Função para iniciar o temporizador de 30 segundos
+  useEffect(() => {
+    if (gameState.timer === 0 || gameState.judge === user.displayName) return;
+
+    const timerInterval = setInterval(() => {
+      setGameState((prevState) => ({
+        ...prevState,
+        timer: prevState.timer - 1,
+      }));
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [gameState.timer, gameState.judge, user]);
+
+  // Função para jogar uma carta
   const playCard = async () => {
     if (!selectedCard || !gameState || gameState.judge === user.displayName) return;
+
     const gameRef = doc(db, "games", "game-room-1");
 
     await updateDoc(gameRef, {
-      playedCards: [...(gameState.playedCards || []), { user: user.displayName, card: selectedCard }]
+      playedCards: [...(gameState.playedCards || []), { user: user.displayName, card: selectedCard }],
     });
 
     setSelectedCard(null);
   };
 
+  // Função para escolher o vencedor da rodada
   const chooseWinner = async (winningCard) => {
     if (!gameState || gameState.judge !== user.displayName) return;
     const gameRef = doc(db, "games", "game-room-1");
@@ -119,6 +138,27 @@ function Game() {
     }
   };
 
+  // Função para comprar cartas (máximo 5)
+  const buyCards = async () => {
+    const gameRef = doc(db, "games", "game-room-1");
+    const randomWhiteCards = [...cardsData.whiteCards].sort(() => 0.5 - Math.random()).slice(0, 5 - gameState.whiteCards.length);
+
+    await updateDoc(gameRef, {
+      whiteCards: [...gameState.whiteCards, ...randomWhiteCards],
+    });
+  };
+
+  // Função para iniciar a próxima rodada
+  const nextRound = async () => {
+    const gameRef = doc(db, "games", "game-room-1");
+
+    // Reseta o temporizador e as cartas jogadas
+    await updateDoc(gameRef, {
+      playedCards: [],
+      timer: 30,
+    });
+  };
+
   return (
     <div>
       <h1>Jogo - Cartas Contra a Humanidade</h1>
@@ -134,6 +174,18 @@ function Game() {
           )
         ))}
       </div>
+
+      {/* Temporizador */}
+      {gameState.timer > 0 ? (
+        <div>
+          <p>Tempo restante: {gameState.timer}s</p>
+        </div>
+      ) : (
+        <div>
+          <p>Tempo esgotado!</p>
+        </div>
+      )}
+
       <button onClick={playCard} disabled={!selectedCard || gameState.judge === user.displayName}>
         Jogar Carta
       </button>
@@ -154,6 +206,12 @@ function Game() {
           <h2>Parabéns, {gameState.winner} venceu!</h2>
         </div>
       )}
+
+      <button onClick={nextRound}>Próxima Rodada</button>
+
+      <button onClick={buyCards} disabled={gameState.whiteCards.length >= 5}>
+        Comprar Cartas
+      </button>
     </div>
   );
 }
