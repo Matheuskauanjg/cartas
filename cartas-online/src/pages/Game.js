@@ -77,7 +77,7 @@ function Game() {
   }, [navigate, user]);
 
   const playCard = async () => {
-    if (!selectedCard || !gameState) return;
+    if (!selectedCard || !gameState || gameState.judge === user.displayName) return;
     const gameRef = doc(db, "games", "game-room-1");
 
     await updateDoc(gameRef, {
@@ -125,13 +125,18 @@ function Game() {
       {gameState && <h2>Pergunta: {gameState.blackCard}</h2>}
       <div>
         <h3>Suas cartas:</h3>
+        {/* O jogador não pode jogar se for o juiz */}
         {gameState?.whiteCards?.map((card, index) => (
-          <button key={index} onClick={() => setSelectedCard(card)}>
-            {card}
-          </button>
+          gameState.judge !== user.displayName && (
+            <button key={index} onClick={() => setSelectedCard(card)}>
+              {card}
+            </button>
+          )
         ))}
       </div>
-      <button onClick={playCard} disabled={!selectedCard}>Jogar Carta</button>
+      <button onClick={playCard} disabled={!selectedCard || gameState.judge === user.displayName}>
+        Jogar Carta
+      </button>
 
       {gameState?.judge === user.displayName && (
         <div>
