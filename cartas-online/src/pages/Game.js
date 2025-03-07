@@ -198,9 +198,6 @@ function Game() {
 
   const nextRound = async () => {
     const randomBlackCard = shuffle(cardsData.blackCards)[0];
-    const updatedPlayers = gameState.players.map((player) => {
-      return { ...player }; // Não alterar o deck do jogador
-    });
 
     try {
       await updateDoc(gameRef, {
@@ -208,9 +205,9 @@ function Game() {
         blackCard: randomBlackCard,
         timer: 30,
         roundOver: false,
-        players: updatedPlayers,
+        // Não alteramos o deck de cartas dos jogadores aqui
       });
-    } catch (error)      {
+    } catch (error) {
       console.error("Erro ao iniciar próxima rodada:", error);
     }
   };
@@ -218,8 +215,8 @@ function Game() {
   const buyCards = async () => {
     const updatedPlayers = gameState.players.map((player) => {
       if (player.whiteCards.length < 10) {
-        const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards.length || 0)));
-        player.whiteCards = [...(player.whiteCards || []), ...newCards];
+        const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - player.whiteCards.length));
+        player.whiteCards = [...player.whiteCards, ...newCards];
       }
       return player;
     });
