@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, setDoc, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
 import cardsData from "../data/cards.json";
-import { TIMER_CONFIG } from "../config/timerConfig";  // Importa a configuração
 
 function Game() {
   const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
-  const [timer, setTimer] = useState(TIMER_CONFIG.cardTime);
-  const [judgeTimer, setJudgeTimer] = useState(TIMER_CONFIG.judgeTime);
+  const [timer, setTimer] = useState(30);
   const navigate = useNavigate();
   const user = auth.currentUser;
   const gameRef = doc(db, "games", "game-room-1");
@@ -34,15 +32,11 @@ function Game() {
         const newPlayer = {
           name: user.displayName,
           score: 0,
-          whiteCards: shuffle(cardsData.whiteCards).slice(0, 10),
+          whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // Cartas iniciais do jogador
         };
 
         await updateDoc(gameRef, { players: [...currentPlayers, newPlayer] });
         console.log("Jogador adicionado:", newPlayer);
-      } else if (!existingPlayer.whiteCards || existingPlayer.whiteCards.length === 0) {
-        existingPlayer.whiteCards = shuffle(cardsData.whiteCards).slice(0, 10);
-        await updateDoc(gameRef, { players: currentPlayers });
-        console.log("Cartas do jogador atualizadas:", existingPlayer);
       }
     } catch (error) {
       console.error("Erro ao adicionar jogador:", error);
@@ -75,7 +69,7 @@ function Game() {
             judge: user.displayName,
             winner: null,
             players: [initialPlayer],
-            timer: TIMER_CONFIG.cardTime,
+            timer: 30,
             roundOver: false,
           });
 
@@ -86,7 +80,7 @@ function Game() {
             judge: user.displayName,
             winner: null,
             players: [initialPlayer],
-            timer: TIMER_CONFIG.cardTime,
+            timer: 30,
             roundOver: false,
           });
         } else {
@@ -112,39 +106,28 @@ function Game() {
   }, [navigate, user, addPlayerToGame, gameRef]);
 
   useEffect(() => {
-    if (gameState && !gameState.roundOver) {
-      const countdownTimer = setInterval(() => {
-        if (gameState.timer > 0) {
-          setGameState((prev) => ({
-            ...prev,
-            timer: prev.timer - 1,
-          }));
-        } else if (gameState.timer === 0 && gameState.judge === user.displayName) {
-          setJudgeTimer(TIMER_CONFIG.judgeTime); // Reinicia o tempo do juiz
-        } else if (gameState.timer === 0 && gameState.judge !== user.displayName) {
-          clearInterval(countdownTimer);
-        }
+    let interval;
+    if (gameState && gameState.timer > 0 && !gameState.roundOver) {
+      interval = setInterval(() => {
+        setTimer((prevTimer) => prevTimer - 1);
       }, 1000);
-
-      return () => clearInterval(countdownTimer);
+    } else {
+      clearInterval(interval);
     }
-  }, [gameState, user]);
+
+    return () => clearInterval(interval);
+  }, [gameState]);
 
   useEffect(() => {
-    if (gameState && gameState.judge === user.displayName && judgeTimer > 0) {
-      const judgeCountdown = setInterval(() => {
-        if (judgeTimer > 0) {
-          setJudgeTimer((prev) => prev - 1);
-        } else {
-          console.log("Tempo de escolha do juiz acabou! Empate.");
-          // Lógica para lidar com empate, se necessário
-          setJudgeTimer(0); // Para o temporizador do juiz
-        }
-      }, 1000);
-
-      return () => clearInterval(judgeCountdown);
+    if (timer === 0 && !gameState.roundOver) {
+      console.log("Tempo esgotado!");
+      // Lógica para finalizar rodada ou algo que você queira fazer
     }
-  }, [gameState, judgeTimer, user]);
+  }, [timer, gameState]);
+
+  if (!gameState) {
+    return <div>Carregando...</div>;
+  }
 
   const playCard = async () => {
     if (!selectedCard || gameState.judge === user.displayName || gameState.roundOver) return;
@@ -189,6 +172,7 @@ function Game() {
         });
       }
 
+      // Remover a carta jogada do deck do jogador
       await removeCardFromPlayerDeck(winningCard.user, winningCard.card);
     } catch (error) {
       console.error("Erro ao escolher vencedor:", error);
@@ -215,15 +199,14 @@ function Game() {
   const nextRound = async () => {
     const randomBlackCard = shuffle(cardsData.blackCards)[0];
     const updatedPlayers = gameState.players.map((player) => {
-      player.whiteCards = shuffle(cardsData.whiteCards).slice(0, 10); // Distribui novas cartas
-      return player;
+      return { ...player }; // Não alterar o deck do jogador
     });
 
     try {
       await updateDoc(gameRef, {
         playedCards: [],
         blackCard: randomBlackCard,
-        timer: TIMER_CONFIG.cardTime,
+        timer: 30,
         roundOver: false,
         players: updatedPlayers,
       });
@@ -234,8 +217,10 @@ function Game() {
 
   const buyCards = async () => {
     const updatedPlayers = gameState.players.map((player) => {
-      const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards?.length || 0)));
-      player.whiteCards = [...(player.whiteCards || []), ...newCards];
+      if (player.whiteCards.length < 10) {
+        const newCards = shuffle(cardsData.whiteCards.slice(0, 5 - (player.whiteCards.length || 0)));
+        player.whiteCards = [...(player.whiteCards || []), ...newCards];
+      }
       return player;
     });
 
@@ -267,9 +252,9 @@ function Game() {
         ))}
       </div>
 
-      {gameState.timer > 0 && !gameState.roundOver ? (
+      {timer > 0 && !gameState.roundOver ? (
         <div>
-          <p>Tempo restante para enviar a carta: {gameState.timer}s</p>
+          <p>Tempo restante: {timer}s</p>
         </div>
       ) : gameState.roundOver ? (
         <div>
@@ -278,13 +263,7 @@ function Game() {
         </div>
       ) : (
         <div>
-          <p>Tempo esgotado para enviar a carta!</p>
-        </div>
-      )}
-
-      {gameState.judge === user.displayName && judgeTimer > 0 && !gameState.roundOver && (
-        <div>
-          <p>Tempo restante para escolher o vencedor: {judgeTimer}s</p>
+          <p>Tempo esgotado!</p>
         </div>
       )}
 
