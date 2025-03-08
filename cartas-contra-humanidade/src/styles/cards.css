@@ -1,0 +1,26 @@
+/* src/styles/cards.css */
+.card {
+    background-color: #fff;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 16px;
+    padding: 20px;
+    cursor: pointer;
+    transition: transform 0.3s;
+  }
+  
+  .card:hover {
+    transform: scale(1.05);
+  }
+  
+  .card-black {
+    background-color: #333;
+    color: #fff;
+  }
+  
+  .card-white {
+    background-color: #f9f9f9;
+    color: #000;
+  }
+  
