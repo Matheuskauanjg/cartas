@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getGameState, startGameIfReady } from '../firebase/gameService'; // Importando a função para iniciar o jogo
 
 const Lobby = () => {
-  const { gameId } = useParams();
+  const { gameId } = useParams(); // Pega o ID da sala da URL
   const [gameState, setGameState] = useState(null);
 
   useEffect(() => {
@@ -19,8 +19,10 @@ const Lobby = () => {
     if (gameState.players.length >= 3) {
       // Chama a função que verifica se o jogo pode começar
       await startGameIfReady(gameId);
-      // Atualiza o estado local, para que o botão desapareça depois de iniciar o jogo
+      // Atualiza o estado local para refletir que o jogo foi iniciado
       setGameState(prevState => ({ ...prevState, state: 'started' }));
+    } else {
+      alert('Não há jogadores suficientes para iniciar o jogo!');
     }
   };
 

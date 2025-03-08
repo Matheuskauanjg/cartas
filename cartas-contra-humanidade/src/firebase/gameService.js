@@ -1,6 +1,6 @@
 // src/firebase/gameService.js
 import { db } from './firebaseConfig';
-import { collection, doc, setDoc, getDoc, addDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore'; // Usando updateDoc para atualizar o estado da sala
 
 const gamesRef = collection(db, 'games'); // Referência para a coleção de jogos
 
@@ -40,15 +40,18 @@ export const getGameState = async (gameId) => {
 // Função para iniciar o jogo quando o número de jogadores for suficiente
 export const startGameIfReady = async (gameId) => {
   try {
-    const gameRef = doc(db, 'games', gameId);
-    const gameDoc = await getDoc(gameRef);
+    const gameRef = doc(db, 'games', gameId); // Referência para a sala de jogo no Firestore
+    const gameDoc = await getDoc(gameRef); // Pega o documento da sala
 
     if (gameDoc.exists()) {
       const gameData = gameDoc.data();
 
-      // Verifica se o número de jogadores é suficiente (aqui você pode definir o número mínimo de jogadores, por exemplo, 3)
+      // Verifica se o número de jogadores é suficiente
       if (gameData.players.length >= 3) {
-        await setDoc(gameRef, { state: 'started' }, { merge: true });
+        // Atualiza o estado da sala para "started" sem sobrescrever outros dados
+        await updateDoc(gameRef, {
+          state: 'started',
+        });
         console.log('Jogo iniciado');
       } else {
         console.log('Número insuficiente de jogadores para iniciar o jogo');
