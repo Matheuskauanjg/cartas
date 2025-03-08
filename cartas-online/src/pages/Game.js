@@ -59,7 +59,7 @@ function Game() {
           const initialPlayer = {
             name: user.displayName,
             score: 0,
-            whiteCards: shuffle(cardsData.whiteCards).slice(0, 10), // Cartas iniciais do jogador
+            whiteCards: shuffle(cardsData.whiteCards).slice(0, 10),
           };
 
           await setDoc(gameRef, {
