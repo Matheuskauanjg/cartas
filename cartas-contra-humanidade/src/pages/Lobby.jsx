@@ -1,13 +1,31 @@
 // src/pages/Lobby.jsx
-import React from 'react';
-import PlayerList from '../components/PlayerList';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { getGameState } from '../firebase/gameService'; // Corrija a importação para getGameState
 
-const Lobby = ({ players, onStartGame }) => {
+const Lobby = () => {
+  const { gameId } = useParams(); // Pega o gameId da URL
+  const [gameState, setGameState] = useState(null);
+
+  useEffect(() => {
+    const fetchGameState = async () => {
+      const state = await getGameState(gameId);
+      setGameState(state);
+    };
+
+    fetchGameState();
+  }, [gameId]);
+
+  if (!gameState) {
+    return <div>Carregando a sala...</div>;
+  }
+
   return (
     <div>
-      <h2>Lobby - Aguarde o início do jogo</h2>
-      <PlayerList players={players} />
-      <button onClick={onStartGame}>Iniciar Jogo</button>
+      <h1>Bem-vindo à Sala de Jogo!</h1>
+      <p>Nome da Sala: {gameState.name}</p>
+      <p>Status da Sala: {gameState.state}</p>
+      {/* Aqui você pode adicionar mais interações ou detalhes sobre o estado da sala */}
     </div>
   );
 };

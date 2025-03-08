@@ -1,23 +1,28 @@
 // src/firebase/gameService.js
 import { db } from './firebaseConfig';
-import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, addDoc } from 'firebase/firestore';
 
-const gameRef = doc(db, 'games', 'game-room-1'); // Documento específico da sala
+const gamesRef = collection(db, 'games'); // Referência para a coleção de jogos
 
-// Salvar estado do jogo no Firestore
-export const saveGameState = async (gameState) => {
+// Função para criar uma nova sala de jogo
+export const createGameRoom = async (roomName) => {
   try {
-    await setDoc(gameRef, gameState);
-    console.log('Estado do jogo salvo');
+    const newGameRef = await addDoc(gamesRef, {
+      name: roomName,
+      players: [],
+      state: 'waiting', // O estado inicial da sala
+    });
+    console.log('Sala de jogo criada:', newGameRef.id);
+    return newGameRef.id; // Retorna o ID da sala criada
   } catch (error) {
-    console.error('Erro ao salvar o estado do jogo:', error);
+    console.error('Erro ao criar a sala de jogo:', error);
   }
 };
 
-// Obter o estado do jogo
-export const getGameState = async () => {
+// Obter o estado de uma sala de jogo existente
+export const getGameState = async (gameId) => {  // Garanta que seja getGameState
   try {
-    const gameSnapshot = await getDoc(gameRef);
+    const gameSnapshot = await getDoc(doc(gamesRef, gameId));
     if (gameSnapshot.exists()) {
       return gameSnapshot.data();
     } else {

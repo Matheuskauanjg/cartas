@@ -1,21 +1,30 @@
 // src/pages/GameRoom.jsx
-import React, { useState } from 'react';
-import PlayerList from '../components/PlayerList';
-import CardDeck from '../components/CardDeck';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { getGameState } from '../firebase/gameService';
 
 const GameRoom = () => {
-  const [players, setPlayers] = useState([]);
-  const [cards, setCards] = useState([]);
+  const { gameId } = useParams(); // Pega o ID da sala da URL
+  const [gameState, setGameState] = useState(null);
 
-  const handleCardSelect = (card) => {
-    console.log('Carta escolhida:', card);
-  };
+  useEffect(() => {
+    const fetchGameState = async () => {
+      const state = await getGameState(gameId);
+      setGameState(state);
+    };
+
+    fetchGameState();
+  }, [gameId]);
+
+  if (!gameState) {
+    return <div>Carregando a sala...</div>;
+  }
 
   return (
     <div>
-      <h2>Sala de Jogo</h2>
-      <PlayerList players={players} />
-      <CardDeck cards={cards} onCardSelect={handleCardSelect} />
+      <h1>Sala de Jogo: {gameState.name}</h1>
+      <p>Estado da sala: {gameState.state}</p>
+      {/* Adicione mais lógica aqui para a interação do jogo */}
     </div>
   );
 };
