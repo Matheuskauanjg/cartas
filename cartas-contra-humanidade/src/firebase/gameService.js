@@ -1,6 +1,6 @@
 // src/firebase/gameService.js
-import { db } from './firebaseConfig';
-import { doc, updateDoc, getDoc } from 'firebase/firestore'; // Usando updateDoc para atualizar o estado da sala
+import { db } from './firebaseConfig';  // Certifique-se de que db está configurado corretamente
+import { collection, doc, setDoc, getDoc, addDoc, updateDoc } from 'firebase/firestore'; // Adicionando collection aqui
 
 const gamesRef = collection(db, 'games'); // Referência para a coleção de jogos
 
