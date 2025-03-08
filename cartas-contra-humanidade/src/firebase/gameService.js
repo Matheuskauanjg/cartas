@@ -19,17 +19,44 @@ export const createGameRoom = async (roomName) => {
   }
 };
 
-// Obter o estado de uma sala de jogo existente
-export const getGameState = async (gameId) => {  // Garanta que seja getGameState
+// Função para obter o estado de uma sala de jogo existente
+export const getGameState = async (gameId) => {
   try {
-    const gameSnapshot = await getDoc(doc(gamesRef, gameId));
-    if (gameSnapshot.exists()) {
-      return gameSnapshot.data();
+    const gameRef = doc(db, 'games', gameId); // Acessa a coleção "games" no Firestore
+    const gameDoc = await getDoc(gameRef); // Pega o documento da sala
+
+    if (gameDoc.exists()) {
+      return gameDoc.data(); // Retorna os dados da sala
     } else {
-      console.log('Jogo não encontrado');
+      console.error('Sala não encontrada');
       return null;
     }
   } catch (error) {
-    console.error('Erro ao obter o estado do jogo:', error);
+    console.error('Erro ao obter o estado da sala:', error);
+    return null;
+  }
+};
+
+// Função para iniciar o jogo quando o número de jogadores for suficiente
+export const startGameIfReady = async (gameId) => {
+  try {
+    const gameRef = doc(db, 'games', gameId);
+    const gameDoc = await getDoc(gameRef);
+
+    if (gameDoc.exists()) {
+      const gameData = gameDoc.data();
+
+      // Verifica se o número de jogadores é suficiente (aqui você pode definir o número mínimo de jogadores, por exemplo, 3)
+      if (gameData.players.length >= 3) {
+        await setDoc(gameRef, { state: 'started' }, { merge: true });
+        console.log('Jogo iniciado');
+      } else {
+        console.log('Número insuficiente de jogadores para iniciar o jogo');
+      }
+    } else {
+      console.error('Sala não encontrada');
+    }
+  } catch (error) {
+    console.error('Erro ao iniciar o jogo:', error);
   }
 };
