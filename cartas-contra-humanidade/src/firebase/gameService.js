@@ -1,12 +1,23 @@
 // src/firebase/gameService.js
 import { db } from './firebaseConfig';  // Certifique-se de que db está configurado corretamente
-import { collection, doc, setDoc, getDoc, addDoc, updateDoc } from 'firebase/firestore'; // Adicionando collection aqui
+import { collection, doc, setDoc, getDoc, addDoc, updateDoc, query, where, getDocs } from 'firebase/firestore'; // Adicionando query, where, e getDocs
 
 const gamesRef = collection(db, 'games'); // Referência para a coleção de jogos
 
 // Função para criar uma nova sala de jogo
 export const createGameRoom = async (roomName) => {
   try {
+    // Verifica se já existe uma sala com o nome fornecido
+    const q = query(gamesRef, where("name", "==", roomName));
+    const querySnapshot = await getDocs(q); // Executa a consulta
+
+    // Se a consulta retornar documentos, significa que a sala já existe
+    if (!querySnapshot.empty) {
+      console.log('Já existe uma sala com esse nome');
+      return null; // Retorna null se já existir uma sala com o mesmo nome
+    }
+
+    // Cria uma nova sala caso não exista uma com o mesmo nome
     const newGameRef = await addDoc(gamesRef, {
       name: roomName,
       players: [],
